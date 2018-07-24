@@ -10,6 +10,7 @@ LIBS = -lnsl ${LSF_LIBDIR}/libbat.a ${LSF_LIBDIR}/liblsf.a
 #CFLAGS = -g -DDEBUG
 CFLAGS = -fPIC
 LNKFLAGS = -x -shared
+MNAME := $(shell uname -m)
 
 SOURCE_FILES = pam_lsf.c
 OBJECT_FILES = pam_lsf.o 
@@ -24,5 +25,6 @@ clean:
 	rm -f pam_lsf.so pam_lsf.o core*
 
 install:
-	cp -p pam_lsf.so /lib64/security
+	if [ -d /lib64/security ]; then cp -p pam_lsf.so /lib64/security; fi;
+	if [ -d /lib/$(MNAME)-linux-gnu/security ]; then cp -p pam_lsf.so /lib/$(MNAME)-linux-gnu/security; fi;
 
