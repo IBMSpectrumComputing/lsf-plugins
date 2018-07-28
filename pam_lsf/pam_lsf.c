@@ -170,6 +170,11 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
 		syslog(LOG_NOTICE, "pam_lsf.so: hostname = %s", name.nodename);
 	}
 
+	/* allow root logins */
+	if (strncasecmp(user, "root", 4)) {
+		return PAM_SUCCESS;
+	}
+
 	if (lsf_admin_check(user, &debug)) {
 		syslog(LOG_NOTICE, "pam_lsf.so: auth success for LSF admin (%s)", user);
 		return PAM_SUCCESS;
@@ -240,6 +245,11 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	if (debug) {
 		syslog(LOG_NOTICE, "pam_lsf.so: hostname = %s", name.nodename);
+	}
+
+	/* allow root logins */
+	if (strncasecmp(user, "root", 4)) {
+		return PAM_SUCCESS;
 	}
 
 	if (lsf_admin_check(user, &debug)) {
