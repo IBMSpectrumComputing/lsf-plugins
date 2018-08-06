@@ -171,7 +171,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
 	}
 
 	/* allow root logins */
-	if (strncasecmp(user, "root", 4)) {
+	if (strncasecmp(user, "root", 4) == 0) {
 		return PAM_SUCCESS;
 	}
 
@@ -248,7 +248,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	/* allow root logins */
-	if (strncasecmp(user, "root", 4)) {
+	if (strncasecmp(user, "root", 4) == 0) {
 		return PAM_SUCCESS;
 	}
 
