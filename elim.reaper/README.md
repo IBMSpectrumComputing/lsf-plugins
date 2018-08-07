@@ -33,3 +33,33 @@ compute hosts once their jobs have left the system.  It provides an optional gra
 You can optionally set a LSF_SLEEP_TIME to a value in seconds as well.  As you clusters become larger, you may not want them querying the batch system as much, so increasing this value may be practical in such cases.  This value is also in seconds.
 
 If you wish to see debug output from the elim, you may run it with the --debug option.
+
+## Community Contribution Requirements
+
+Community contributions to this repository must follow the [IBM Developer's Certificate of Origin (DCO)](https://github.com/IBMSpectrumComputing/platform-python-lsf-api/blob/master/IBMDCO.md) process and only through GitHub Pull Requests:
+
+ 1. Contributor proposes new code to community.
+
+ 2. Contributor signs off on contributions 
+    (i.e. attachs the DCO to ensure contributor is either the code 
+    originator or has rights to publish. The template of the DCO is included in
+    this package).
+ 
+ 3. IBM Spectrum LSF development reviews contribution to check for:
+    i)  Applicability and relevancy of functional content 
+    ii) Any obvious issues
+
+ 4. If accepted, posts contribution. If rejected, work goes back to contributor and is not merged.
+
+## Copyright
+
+(C) Copyright IBM Corporation 2016-2018
+
+U.S. Government Users Restricted Rights - Use, duplication or disclosure 
+restricted by GSA ADP Schedule Contract with IBM Corp.
+
+IBM(R), the IBM logo and ibm.com(R) are trademarks of International Business Machines Corp., 
+registered in many jurisdictions worldwide. Other product and service names might be trademarks 
+of IBM or other companies. A current list of IBM trademarks is available on the Web at 
+"Copyright and trademark information" at www.ibm.com/legal/copytrade.shtml.
+
