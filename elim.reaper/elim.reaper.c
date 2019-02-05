@@ -33,7 +33,7 @@
 int lingerTime = 300;
 int debug = FALSE;
 int mySleep = 60;
-char excludeHosts[2048] = null;
+char excludedHosts[2048];
 
 typedef struct user_struct {
 	char user[40];
@@ -47,7 +47,7 @@ typedef struct admins {
 
 static void display_help(int only_version);
 void load_lsf_reaper();
-int is_excluded_host();
+int is_excluded_host(char *hostname);
 char *ltrim(char *);
 char *rtrim(char *);
 char *trim(char *);
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 
 	load_lsf_reaper();
 
-	if (is_excluded_host()) {
+	if (is_excluded_host(name.nodename)) {
 		exit(ELIM_ABORT_VALUE);
 	}
 	
@@ -200,33 +200,23 @@ int main(int argc, char **argv) {
 	exit(ELIM_ABORT_VALUE);
 }
 
-int is_excluded_host() {
-	char hostname[255];
-	
-	if (excludedHosts == null) {
+int is_excluded_host(char *hostname) {
+	if (excludedHosts == NULL) {
 		return FALSE;
 	}
 	
-	if (gethostname(hostname, sizeof(hostname)) {
-		if (strcasestr(excludedHosts, hostname)) {
-			if (debug) {
-				printf("elim.reaper: host [%s] is an excluded host of [%s].\n", hostname, excludedHosts);
-			}
-
-			return TRUE;
-		} else {
-			if (debug) {
-				printf("elim.reaper: host [%s] is not an excluded host of [%s].\n", hostname, excludedHosts);
-			}
-
-			return FALSE;
+	if (strcasestr(excludedHosts, hostname)) {
+		if (debug) {
+			printf("elim.reaper: host [%s] is an excluded host of [%s].\n", hostname, excludedHosts);
 		}
+
+		return TRUE;
 	} else {
 		if (debug) {
-			printf("elim.reaper: Call to gethostname failed.\n");
+			printf("elim.reaper: host [%s] is not an excluded host of [%s].\n", hostname, excludedHosts);
 		}
 
-		return true;
+		return FALSE;
 	}
 }
 
@@ -295,8 +285,8 @@ void load_lsf_reaper() {
 					mySleep = atoi(value);
 				} else if (STRMATCH(variable, "LSF_LINGER_TIME")) {
 					lingerTime = atoi(value);
-				} else if (STRMATCH(variable, "LSF_EXCLUDE_HOSTS")) {
-					snprintf(excludeHosts, sizeof(excludeHosts), "%s", value);
+				} else if (STRMATCH(variable, "LSF_EXCLUDED_HOSTS")) {
+					snprintf(excludedHosts, sizeof(excludedHosts), "%s", value);
 				}
 			}
 
@@ -671,14 +661,14 @@ static void display_help(int only_version) {
 		"",
 		"The values supported in the lsf.reaper file include:",
 		"",
-		"LSF_LINGER_TIME = X     Number of minutes a user process can run after all jobs",
-		"                        for that user have been gone from the LSF server.",
-		"LSF_SLEEP_TIME = X      Number of seconds before rechecking for processes that",
-		"                        need to leave the system.",
+		"LSF_LINGER_TIME = X      Number of minutes a user process can run after all jobs",
+		"                         for that user have been gone from the LSF server.",
+		"LSF_SLEEP_TIME = X       Number of seconds before rechecking for processes that",
+		"                         need to leave the system.",
 		"",
-		"LSF_EXCLUDE_HOSTS = X   Space delimited list of hosts to exclude from reaper",
-		"                        checking.  These would include login nodes where",
-		"                        interactive logins are permitted by non LSF Admins.",
+		"LSF_EXCLUDED_HOSTS = X   Space delimited list of hosts to exclude from reaper",
+		"                         checking.  These would include login nodes where",
+		"                         interactive logins are permitted by non LSF Admins.",
 		"",
 		"Additionally, to leverage this tool, NEWJOB_REFRESH must be set to 'Y' in",
 		"in lsb.params and it is recommended that you set an LSF_LINGER_TIME",
