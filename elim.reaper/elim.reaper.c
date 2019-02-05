@@ -25,7 +25,7 @@
 #include <lsf/lsbatch.h>
 #include <lsf/lsf.h>
 
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define ELIM_ABORT_VALUE 99
 #define STRMATCH(a,b)   (strcmp((a),(b)) == 0)
 #define STRIMATCH(a,b)  (strcasecmp((a),(b)) == 0)
@@ -33,6 +33,7 @@
 int lingerTime = 300;
 int debug = FALSE;
 int mySleep = 60;
+char excludeHosts[2048] = null;
 
 typedef struct user_struct {
 	char user[40];
@@ -46,6 +47,7 @@ typedef struct admins {
 
 static void display_help(int only_version);
 void load_lsf_reaper();
+int is_excluded_host();
 char *ltrim(char *);
 char *rtrim(char *);
 char *trim(char *);
@@ -114,6 +116,10 @@ int main(int argc, char **argv) {
 
 	load_lsf_reaper();
 
+	if (is_excluded_host()) {
+		exit(ELIM_ABORT_VALUE);
+	}
+	
 	if (valid_lsf_setup()) {
 		if (debug) {
 			printf("elim.reaper: LSF setup is valid\n");
@@ -194,6 +200,36 @@ int main(int argc, char **argv) {
 	exit(ELIM_ABORT_VALUE);
 }
 
+int is_excluded_host() {
+	char hostname[255];
+	
+	if (excludedHosts == null) {
+		return FALSE;
+	}
+	
+	if (gethostname(hostname, sizeof(hostname)) {
+		if (strcasestr(excludedHosts, hostname)) {
+			if (debug) {
+				printf("elim.reaper: host [%s] is an excluded host of [%s].\n", hostname, excludedHosts);
+			}
+
+			return TRUE;
+		} else {
+			if (debug) {
+				printf("elim.reaper: host [%s] is not an excluded host of [%s].\n", hostname, excludedHosts);
+			}
+
+			return FALSE;
+		}
+	} else {
+		if (debug) {
+			printf("elim.reaper: Call to gethostname failed.\n");
+		}
+
+		return true;
+	}
+}
+
 void load_lsf_reaper() {
 	const char *envdir = getenv("LSF_ENVDIR");
 	char reaperfile[255];
@@ -259,6 +295,8 @@ void load_lsf_reaper() {
 					mySleep = atoi(value);
 				} else if (STRMATCH(variable, "LSF_LINGER_TIME")) {
 					lingerTime = atoi(value);
+				} else if (STRMATCH(variable, "LSF_EXCLUDE_HOSTS")) {
+					snprintf(excludeHosts, sizeof(excludeHosts), "%s", value);
 				}
 			}
 
@@ -633,10 +671,14 @@ static void display_help(int only_version) {
 		"",
 		"The values supported in the lsf.reaper file include:",
 		"",
-		"LSF_LINGER_TIME = X  Number of minutes a user process can run after all jobs",
-		"                     for that user have been gone from the LSF server.",
-		"LSF_SLEEP_TIME = X   Number of seconds before rechecking for processes that",
-		"                     need to leave the system.",
+		"LSF_LINGER_TIME = X     Number of minutes a user process can run after all jobs",
+		"                        for that user have been gone from the LSF server.",
+		"LSF_SLEEP_TIME = X      Number of seconds before rechecking for processes that",
+		"                        need to leave the system.",
+		"",
+		"LSF_EXCLUDE_HOSTS = X   Space delimited list of hosts to exclude from reaper",
+		"                        checking.  These would include login nodes where",
+		"                        interactive logins are permitted by non LSF Admins.",
 		"",
 		"Additionally, to leverage this tool, NEWJOB_REFRESH must be set to 'Y' in",
 		"in lsb.params and it is recommended that you set an LSF_LINGER_TIME",
@@ -649,7 +691,7 @@ static void display_help(int only_version) {
         0 /* ENDMARKER */
     };
 
-    printf("elim.reaper %s Copyright 2018 Internaltional Business Machines, Inc.\n", VERSION);
+    printf("elim.reaper %s Copyright 2018-2019 Internaltional Business Machines, Inc.\n", VERSION);
 
     if (only_version == FALSE) {
         printf("\n");
