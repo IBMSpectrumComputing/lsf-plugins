@@ -229,7 +229,7 @@ void load_lsf_reaper() {
 	size_t len  = 0;
 	ssize_t read;
 	char variable[60];
-	char value[60];
+	char value[2048];
 
 	snprintf(reaperfile, sizeof(reaperfile), "%s/%s", envdir, "lsf.reaper");
 
@@ -344,7 +344,7 @@ char *trim(char *str) {
  */
 char *rtrim(char *str) {
 	char    *end;
-	char    *trim = " \t\n\r";
+	char    *trim = "\"' \t\n\r";
 
 	if (!str) return NULL;
 
@@ -366,7 +366,7 @@ char *rtrim(char *str) {
  *  \return the trimmed string.
  */
 char *ltrim(char *str) {
-	char    *trim = " \t\n\r";
+	char    *trim = "\"' \t\n\r";
 
 	if (!str) return NULL;
 
