@@ -32,6 +32,8 @@ compute hosts once their jobs have left the system.  It provides an optional gra
 
 You can optionally set a LSF_SLEEP_TIME to a value in seconds as well.  As you clusters become larger, you may not want them querying the batch system as much, so increasing this value may be practical in such cases.  This value is also in seconds.
 
+You can also optionally set LSF_EXCLUDED_HOSTS to a space delimited list of hostnames that should be excluded from the reaper check.  An example of a host such as this would be a Login Node that is running LSF daemons for some reason.  As always, LSF Administrators are not reaped, so this would not have to include hosts in the LSF_MASTER_LIST.
+
 If you wish to see debug output from the elim, you may run it with the --debug option.
 
 ## Community Contribution Requirements
