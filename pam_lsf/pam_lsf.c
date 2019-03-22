@@ -2,7 +2,7 @@
 
 /*
  * Originally written by Mahmoud Hanafi <hanafim@asc.hpc.mil>
- * 
+ *
  * Enhanced by Larry Adams <adamsla@us.ibm.com>
  *
  */
@@ -11,8 +11,8 @@
 #define TRUE 1
 #define FALSE 0
 
-#define MAX_RETRIES 5 
-#define SLEEP_TIME 5 
+#define MAX_RETRIES 5
+#define SLEEP_TIME 5
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,9 +68,11 @@ int lsf_check(const char *username, char *hostname, int *debug) {
 		}
 
 		sleep(SLEEP_TIME);
+
+		retries++;
 	}
 
-	return false;
+	return FALSE;
 }
 
 int lsf_admin_check(const char *user, int *debug) {
@@ -121,7 +123,7 @@ int parse_args(int argc, const char **argv, int *debug) {
 			*debug = TRUE;
 			syslog(LOG_NOTICE, "pam_lsf.so: argv[%i] = %s", i, argv[i]);
 		}
-	}	
+	}
 
 	return 0;
 }
@@ -146,7 +148,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
 	if (debug) {
 		syslog(LOG_NOTICE, "pam_lsf.so: starting auth");
 	}
-    
+
 	retval = pam_get_user(pamh, &user, NULL);
 
 	if (retval != PAM_SUCCESS) {
@@ -219,11 +221,11 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (debug) {
 		syslog(LOG_NOTICE, "pam_lsf.so: parsing done");
 	}
-	
+
 	if (debug) {
 		syslog(LOG_NOTICE, "pam_lsf.so: starting acct_mgmt");
 	}
-    
+
 	retval = pam_get_user(pamh, &user, NULL);
 
 	if (retval != PAM_SUCCESS) {
