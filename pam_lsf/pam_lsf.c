@@ -11,6 +11,9 @@
 #define TRUE 1
 #define FALSE 0
 
+#define MAX_RETRIES 5 
+#define SLEEP_TIME 5 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -39,6 +42,7 @@
 int lsf_check(const char *username, char *hostname, int *debug) {
 	int options = CUR_JOB;
 	int jobs;
+	int retries = 0;
 
 	/* initializing LSF */
 	if (debug) {
@@ -54,15 +58,19 @@ int lsf_check(const char *username, char *hostname, int *debug) {
 		syslog(LOG_NOTICE, "pam_lsf.so: checking LSF user=%s hostname=%s", username, hostname);
 	}
 
-	jobs = lsb_openjobinfo(0, NULL, (char *) username, NULL, hostname, options);
+	while (retries < MAX_RETRIES) {
+		jobs = lsb_openjobinfo(0, NULL, (char *) username, NULL, hostname, options);
 
-	lsb_closejobinfo();
+		lsb_closejobinfo();
 
-	if (jobs < 1) {
-		return FALSE;
-	} else {
-		return TRUE;
+		if (jobs > 0) {
+			return TRUE;
+		}
+
+		sleep(SLEEP_TIME);
 	}
+
+	return false;
 }
 
 int lsf_admin_check(const char *user, int *debug) {
