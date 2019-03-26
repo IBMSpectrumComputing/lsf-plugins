@@ -11,8 +11,8 @@
 #define TRUE 1
 #define FALSE 0
 
-#define MAX_RETRIES 5
-#define SLEEP_TIME 5
+#define MAX_RETRIES 6
+#define SLEEP_TIME 2
 
 #include <stdio.h>
 #include <stdlib.h>
