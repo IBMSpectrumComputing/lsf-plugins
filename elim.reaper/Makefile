@@ -6,7 +6,7 @@
 CC = gcc
 LSF_TOPDIR = ${LSF_SERVERDIR}/../..
 INCLUDE_DIR = ${LSF_TOPDIR}/include
-LIBS = -lnsl -ldl ${LSF_LIBDIR}/libbat.a ${LSF_LIBDIR}/liblsf.a 
+LIBS = -lnsl -ldl -lm ${LSF_LIBDIR}/libbat.a ${LSF_LIBDIR}/liblsf.a 
 CFLAGS = -fPIC
 #CFLAGS = -fPIC
 LNKFLAGS = -x -shared

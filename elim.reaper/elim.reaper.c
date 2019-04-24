@@ -15,6 +15,7 @@
 #define FALSE 0
 
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <syslog.h>
 #include <string.h>
@@ -446,9 +447,11 @@ int get_login_sessions(user_struct_t *users, int maxLogins) {
 
 		if (i > maxLogins) {
 			syslog(LOG_WARNING, "WARNING: Maximum number of logins (%d) Reached\n", maxLogins);
-			return logins;
+			break;
 		}
 	}
+
+	pclose(fp);
 
 	return logins;
 }
