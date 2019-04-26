@@ -1,8 +1,8 @@
 /*
  * Name:    elim.reaper
  *
- * Purpose: LSF ELIM plugin to remove user login processes from 
- *          LSF compute hosts for users who are not part of an 
+ * Purpose: LSF ELIM plugin to remove user login processes from
+ *          LSF compute hosts for users who are not part of an
  *          active job, or that have lingered beyond the
  *          linger timeout as defined by the lsf.reaper configuration
  *          file in the $LSF_ENVDIR.
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
 	if (is_excluded_host(name.nodename)) {
 		exit(ELIM_ABORT_VALUE);
 	}
-	
+
 	if (valid_lsf_setup()) {
 		if (debug) {
 			syslog(LOG_NOTICE, "elim.reaper: LSF setup is valid");
@@ -150,13 +150,12 @@ int main(int argc, char **argv) {
 											break;
 										}
 									} else {
-										if (debug) {
-											syslog(LOG_WARNING, "elim.reaper: killing login process group for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
+										if (loginUsers[i].pid > 1) {
+											syslog(LOG_WARNING, "elim.reaper: killing login process for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
+											killpg(loginUsers[i].pid, SIGKILL);
+										} else {
+											syslog(LOG_WARNING, "elim.reaper: login user (%s) has an invalid pid (%d) unable to kill.", loginUsers[i].user, loginUsers[i].pid);
 										}
-
-										syslog(LOG_NOTICE, "elim.reaper: killing login process for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
-
-										killpg(loginUsers[i].pid, SIGKILL);
 
 										break;
 									}
@@ -164,13 +163,13 @@ int main(int argc, char **argv) {
 									j++;
 								}
 							} else {
-								if (debug) {
+								if (loginUsers[i].pid > 1) {
 									syslog(LOG_WARNING, "elim.reaper: killing login process group for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
+
+									killpg(loginUsers[i].pid, SIGKILL);
+								} else {
+									syslog(LOG_WARNING, "elim.reaper: login user (%s) has an invalid pid (%d) unable to kill.", loginUsers[i].user, loginUsers[i].pid);
 								}
-
-								syslog(LOG_NOTICE, "elim.reaper: killing login process group for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
-
-								killpg(loginUsers[i].pid, SIGKILL);
 							}
 						} else if (debug) {
 							syslog(LOG_NOTICE, "elim.reaper: User (%s) is an LSF Admin skipping", loginUsers[i].user);
@@ -191,14 +190,14 @@ int main(int argc, char **argv) {
 			memset(jobUsers, 0, sizeof(jobUsers));
 
 			if (debug) {
-				printf("elim.reaper: Sleeping for %d seconds.\n", mySleep);
+				syslog(LOG_NOTICE, "elim.reaper: Sleeping for %d seconds.", mySleep);
 			}
 
 			printf("1 reaper 1\n");
 
 			sleep(mySleep);
 		}
-	} 
+	}
 
 	exit(ELIM_ABORT_VALUE);
 }
@@ -207,16 +206,16 @@ int is_excluded_host(char *hostname) {
 	if (excludedHosts == NULL) {
 		return FALSE;
 	}
-	
+
 	if (strcasestr(excludedHosts, hostname)) {
 		if (debug) {
-			printf("elim.reaper: host [%s] is an excluded host of [%s].\n", hostname, excludedHosts);
+			syslog(LOG_NOTICE, "elim.reaper: host [%s] is an excluded host of [%s].", hostname, excludedHosts);
 		}
 
 		return TRUE;
 	} else {
 		if (debug) {
-			printf("elim.reaper: host [%s] is not an excluded host of [%s].\n", hostname, excludedHosts);
+			syslog(LOG_NOTICE, "elim.reaper: host [%s] is not an excluded host of [%s].", hostname, excludedHosts);
 		}
 
 		return FALSE;
@@ -240,14 +239,14 @@ void load_lsf_reaper() {
 		i = 0;
 
 		if (debug) {
-			printf("elim.reaper: Starting reading the lsf.reaper file.\n");
+			syslog(LOG_NOTICE, "elim.reaper: Starting reading the lsf.reaper file.");
 		}
 
 		fp = fopen(reaperfile, "r");
 
 		if (fp == NULL) {
 			if (debug) {
-				printf("elim.reaper: WARNING: Unable to open the lsf.reaper file.\n");
+				syslog(LOG_NOTICE, "elim.reaper: WARNING: Unable to open the lsf.reaper file.");
 			}
 		}
 
@@ -257,7 +256,7 @@ void load_lsf_reaper() {
 			line = trim(line);
 
 			if (debug) {
-				printf("elim.reaper: LINE: %s\n", line);
+				syslog(LOG_NOTICE, "elim.reaper: LINE: %s", line);
 			}
 
 			j = 0;
@@ -267,12 +266,12 @@ void load_lsf_reaper() {
 				if (j == 0) {
 					snprintf(variable, 40, "%s", trim(p));
 					if (debug) {
-						printf("elim.reaper: VARIABLE: (%s)\n", variable);
+						syslog(LOG_NOTICE, "elim.reaper: VARIABLE: (%s)", variable);
 					}
 				} else if (j == 1) {
 					snprintf(value, 40, "%s", trim(p));
 					if (debug) {
-						printf("elim.reaper: VALUE: (%s)\n", value);
+						syslog(LOG_NOTICE, "elim.reaper: VALUE: (%s)", value);
 					}
 				} else {
 					break;
@@ -299,7 +298,7 @@ void load_lsf_reaper() {
 }
 
 int valid_lsf_setup() {
-	struct    parameterInfo  *paramInfo;
+	struct parameterInfo *paramInfo;
 
 	if (lsb_init("elim.reaper") < 0) {
 		return FALSE;
@@ -310,19 +309,19 @@ int valid_lsf_setup() {
 	}
 
 	if (!paramInfo->newjobRefresh) {
-		printf("elim.reaper: FATAL: Unable to utilize when NEWJOB_REFRESH=N in lsb.params.\n");
-		printf("elim.reaper: Run './elim.reaper --help' for more information.\n");
+		syslog(LOG_WARNING, "elim.reaper: FATAL: Unable to utilize when NEWJOB_REFRESH=N in lsb.params.");
+		syslog(LOG_WARNING, "elim.reaper: Run './elim.reaper --help' for more information.");
 		return FALSE;
 	}
 
 	if (!paramInfo->jobIncludePostproc) {
 		if (lingerTime <= 0) {
-			printf("elim.reaper: FATAL: Unable to use when JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime=0.");
-			printf("elim.reaper: Run './elim.reaper --help' for more information.\n");
+			syslog(LOG_WARNING, "elim.reaper: FATAL: Unable to use when JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime=0.");
+			syslog(LOG_WARNING, "elim.reaper: Run './elim.reaper --help' for more information.");
 			return FALSE;
 		} else if (lingerTime <= 600) {
-			printf("elim.reaper: WARNING: JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime is %d\n", lingerTime);
-			printf("elim.reaper: Run './elim.reaper --help' for more information.\n");
+			syslog(LOG_WARNING, "elim.reaper: WARNING: JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime is %d", lingerTime);
+			syslog(LOG_WARNING, "elim.reaper: Run './elim.reaper --help' for more information.");
 		}
 	}
 
@@ -415,7 +414,7 @@ int get_login_sessions(user_struct_t *users, int maxLogins) {
 		line = trim(line);
 
 		if (debug) {
-			printf("elim.reaper: LINE: %s\n", line);
+			syslog(LOG_NOTICE, "elim.reaper: LINE: %s", line);
 		}
 
 		j = 0;
