@@ -14,7 +14,7 @@
 
 6. This PAM module does allow access for known LSF administrators but if you wish to allow access for other special groups, for example the user group whistle, add the following before of the pam_lsf.so
 
-	`account sufficient /lib64/security/pam_access.so`
+	`account requisite /lib64/security/pam_access.so`
 
 	Then create the file `/etc/security/access.conf` using the following syntax:
 
