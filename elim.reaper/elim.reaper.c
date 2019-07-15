@@ -1,4 +1,4 @@
-/*
+/**
  * Name:    elim.reaper
  *
  * Purpose: LSF ELIM plugin to remove user login processes from
@@ -31,10 +31,16 @@
 #define STRMATCH(a,b)   (strcmp((a),(b)) == 0)
 #define STRIMATCH(a,b)  (strcasecmp((a),(b)) == 0)
 
-int lingerTime = 300;
-int debug = FALSE;
-int mySleep = 60;
+int  lingerTime = 300;
+int  debug = FALSE;
+int  mySleep = 60;
 char excludedHosts[2048];
+char excludedUserGroups[2048];
+int  ugroupRefresh = 3600;
+int  ugroupTime    = 0;
+int  maxGroups = 40;
+int  maxGroupSize = 40;
+int  maxUsers  = 1000;
 
 typedef struct user_struct {
 	char user[40];
@@ -46,6 +52,12 @@ typedef struct admins {
 	char admin[40];
 } admins_t;
 
+char* userGroups[40];
+
+typedef struct groupUsers {
+	char user[40];
+} groupUsers_t;
+
 static void display_help(int only_version);
 void load_lsf_reaper();
 int is_excluded_host(char *hostname);
@@ -53,10 +65,18 @@ char *ltrim(char *);
 char *rtrim(char *);
 char *trim(char *);
 
+void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers);
+
 int main(int argc, char **argv) {
 	int i, j;
 	struct utsname name;
 	char kill_command[60];
+	time_t currentTime = 0;
+	time_t lastTime = 0;
+	time_t refreshUGroup = 0;
+
+	/* create an array to handle excluded user groups */
+	static groupUsers_t *groupUsers;
 
 	/* array structures holding users */
 	user_struct_t *loginUsers;
@@ -110,6 +130,12 @@ int main(int argc, char **argv) {
 		syslog(LOG_NOTICE, "elim.reaper: Current hostname = %s", name.nodename);
 	}
 
+	for (i = 0; i < 40; ++i) {
+		userGroups[i] = malloc(40 * sizeof(char));
+	}
+
+	groupUsers = (groupUsers_t *) calloc(maxUsers, sizeof(groupUsers_t));
+
 	loginUsers = (user_struct_t *) calloc(maxLogins, sizeof(user_struct_t));;
 	jobUsers   = (user_struct_t *) calloc(maxJobUsers, sizeof(user_struct_t));;
 	memset(loginUsers, 0, sizeof(loginUsers));
@@ -127,6 +153,20 @@ int main(int argc, char **argv) {
 		}
 
 		while(TRUE) {
+			currentTime = time(NULL);
+
+			if (debug) {
+				syslog(LOG_NOTICE, "elim.reaper: Time differential = %d", currentTime - lastTime);
+				syslog(LOG_NOTICE, "elim.reaper: Refresh UGroup = %d", ugroupRefresh);
+			}
+
+			if (refreshUGroup == 0 || currentTime - lastTime > ugroupRefresh) {
+				lastTime = currentTime;
+				reloadUserGroups(userGroups, groupUsers);
+			}
+
+			refreshUGroup = currentTime;
+
 			/* get the information on jubs and users */
 			validLogins = get_login_sessions(loginUsers, maxLogins);
 			validJobs   = get_job_users(jobUsers, maxJobUsers, name.nodename);
@@ -136,7 +176,15 @@ int main(int argc, char **argv) {
 
 				while(i < validLogins) {
 					if (loginUsers[i].user != '\0') {
-						if (!is_lsf_admin(loginUsers[i].user)) {
+						if (is_lsf_admin(loginUsers[i].user)) {
+							if (debug) {
+								syslog(LOG_NOTICE, "elim.reaper: User [%s] is an LSF Admin, skipping.", loginUsers[i].user);
+							}
+						} else if (!is_excluded_user(loginUsers[i].user, groupUsers)) {
+							if (debug) {
+								syslog(LOG_NOTICE, "elim.reaper: User [%s] is an Excluded user, skipping.", loginUsers[i].user);
+							}
+						} else {
 							j = 0;
 
 							if (validJobs > 0) {
@@ -144,17 +192,18 @@ int main(int argc, char **argv) {
 									if (jobUsers[j].user != NULL) {
 										if (strcmp(loginUsers[i].user, jobUsers[j].user) == 0) {
 											if (debug) {
-												syslog(LOG_NOTICE, "elim.reaper: Matching job found for (%s)", loginUsers[i].user);
+												syslog(LOG_NOTICE, "elim.reaper: Matching job found for user [%s]", loginUsers[i].user);
 											}
 
 											break;
 										}
 									} else {
 										if (loginUsers[i].pid > 1) {
-											syslog(LOG_WARNING, "elim.reaper: killing login process for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
+											syslog(LOG_WARNING, "elim.reaper: killing login process group for user [%s] with pid [%d] due to no job.", loginUsers[i].user, loginUsers[i].pid);
+
 											killpg(loginUsers[i].pid, SIGKILL);
 										} else {
-											syslog(LOG_WARNING, "elim.reaper: login user (%s) has an invalid pid (%d) unable to kill.", loginUsers[i].user, loginUsers[i].pid);
+											syslog(LOG_WARNING, "elim.reaper: login user [%s] has an invalid pid [%d] unable to kill.", loginUsers[i].user, loginUsers[i].pid);
 										}
 
 										break;
@@ -164,15 +213,13 @@ int main(int argc, char **argv) {
 								}
 							} else {
 								if (loginUsers[i].pid > 1) {
-									syslog(LOG_WARNING, "elim.reaper: killing login process group for user (%s) with pid (%d) due to no job.", loginUsers[i].user, loginUsers[i].pid);
+									syslog(LOG_WARNING, "elim.reaper: killing login process group for user [%s] with pid [%d] due to no job.", loginUsers[i].user, loginUsers[i].pid);
 
 									killpg(loginUsers[i].pid, SIGKILL);
 								} else {
-									syslog(LOG_WARNING, "elim.reaper: login user (%s) has an invalid pid (%d) unable to kill.", loginUsers[i].user, loginUsers[i].pid);
+									syslog(LOG_WARNING, "elim.reaper: login user [%s] has an invalid pid [%d] unable to kill.", loginUsers[i].user, loginUsers[i].pid);
 								}
 							}
-						} else if (debug) {
-							syslog(LOG_NOTICE, "elim.reaper: User (%s) is an LSF Admin skipping", loginUsers[i].user);
 						}
 
 						i++;
@@ -190,7 +237,7 @@ int main(int argc, char **argv) {
 			memset(jobUsers, 0, sizeof(jobUsers));
 
 			if (debug) {
-				syslog(LOG_NOTICE, "elim.reaper: Sleeping for %d seconds.", mySleep);
+				syslog(LOG_NOTICE, "elim.reaper: Sleeping for [%d] seconds.", mySleep);
 			}
 
 			printf("1 reaper 1\n");
@@ -232,6 +279,7 @@ void load_lsf_reaper() {
 	ssize_t read;
 	char variable[60];
 	char value[2048];
+	char *p;
 
 	snprintf(reaperfile, sizeof(reaperfile), "%s/%s", envdir, "lsf.reaper");
 
@@ -250,13 +298,11 @@ void load_lsf_reaper() {
 			}
 		}
 
-		char *p;
-
 		while ((read = getline(&line, &len, fp)) != -1) {
 			line = trim(line);
 
 			if (debug) {
-				syslog(LOG_NOTICE, "elim.reaper: LINE: %s", line);
+				syslog(LOG_NOTICE, "elim.reaper: LINE: [%s].", line);
 			}
 
 			j = 0;
@@ -266,12 +312,12 @@ void load_lsf_reaper() {
 				if (j == 0) {
 					snprintf(variable, 40, "%s", trim(p));
 					if (debug) {
-						syslog(LOG_NOTICE, "elim.reaper: VARIABLE: (%s)", variable);
+						syslog(LOG_NOTICE, "elim.reaper: VARIABLE: [%s].", variable);
 					}
 				} else if (j == 1) {
 					snprintf(value, 40, "%s", trim(p));
 					if (debug) {
-						syslog(LOG_NOTICE, "elim.reaper: VALUE: (%s)", value);
+						syslog(LOG_NOTICE, "elim.reaper: VALUE: [%s].", value);
 					}
 				} else {
 					break;
@@ -289,10 +335,85 @@ void load_lsf_reaper() {
 					lingerTime = atoi(value);
 				} else if (STRMATCH(variable, "LSF_EXCLUDED_HOSTS")) {
 					snprintf(excludedHosts, sizeof(excludedHosts), "%s", value);
+				} else if (STRMATCH(variable, "LSF_EXCLUDED_UGROUPS")) {
+					snprintf(excludedUserGroups, sizeof(excludedUserGroups), "%s", value);
+				} else if (STRMATCH(variable, "LSF_UGROUP_REFRESH")) {
+					ugroupRefresh = atoi(value);
 				}
 			}
 
 			i++;
+		}
+	}
+}
+
+void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers) {
+	int  i, j;
+	char *p;
+	int  enumGrp = 0;
+	int  options = USER_GRP | GRP_RECURSIVE;
+	struct groupInfoEnt *grpInfo = NULL;
+
+	if (debug) {
+		syslog(LOG_NOTICE, "elim.reaper: Excluded Groups [%s].", excludedUserGroups);
+	}
+
+	if (strlen(excludedUserGroups)) {
+		options &= ~GRP_ALL;
+		i = 0;
+		p = strtok(excludedUserGroups, " ");
+
+		while (p != NULL) {
+			snprintf(userGroups[i], 40, "%s", p);
+
+			if (debug) {
+				syslog(LOG_NOTICE, "elim.reaper: Setting Group Member [%s].", userGroups[i]);
+			}
+
+			i++;
+			p = strtok(NULL, " ");
+		}
+
+		userGroups[i] = NULL;
+	} else {
+		return;
+	}
+
+	if (debug) {
+		syslog(LOG_NOTICE, "elim.reaper: Verifying User Groups.");
+	}
+
+	grpInfo = lsb_usergrpinfo(userGroups, &enumGrp, options);
+
+	j = 0;
+	if (enumGrp > 0) {
+		for (i = 0; i < enumGrp; i++){
+			for (j = 0; j < maxGroups; j++) {
+				if (userGroups[j] != NULL) {
+					if (STRIMATCH(grpInfo[i].group, userGroups[j])) {
+						if (debug) {
+							syslog(LOG_NOTICE, "elim.notice: Found Group [%s] with Members: [%s].", grpInfo[i].group, grpInfo[i].memberList);
+						}
+
+						if (strlen(grpInfo[i].memberList)) {
+							p = strtok(grpInfo[i].memberList, " ");
+
+							while (p != NULL) {
+								snprintf(groupUsers[i].user, 40, "%s", p);
+
+								if (debug) {
+									syslog(LOG_NOTICE, "elim.reaper: Group Members: [%s].", groupUsers[i].user);
+								}
+
+								j++;
+								p = strtok(NULL, " ");
+							}
+
+							groupUsers[i].user[0] = '\0';
+						}
+					}
+				}
+			}
 		}
 	}
 }
@@ -309,18 +430,26 @@ int valid_lsf_setup() {
 	}
 
 	if (!paramInfo->newjobRefresh) {
+		printf("elim.reaper: FATAL: Unable to utilize when NEWJOB_REFRESH=N in lsb.params.\n");
+		printf("elim.reaper: Run './elim.reaper --help' for more information.\n");
+
 		syslog(LOG_WARNING, "elim.reaper: FATAL: Unable to utilize when NEWJOB_REFRESH=N in lsb.params.");
 		syslog(LOG_WARNING, "elim.reaper: Run './elim.reaper --help' for more information.");
+
 		return FALSE;
 	}
 
 	if (!paramInfo->jobIncludePostproc) {
 		if (lingerTime <= 0) {
+			printf("elim.reaper: FATAL: Unable to use when JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime=0.\n");
+			printf("elim.reaper: Run './elim.reaper --help' for more information.\n");
+
 			syslog(LOG_WARNING, "elim.reaper: FATAL: Unable to use when JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime=0.");
 			syslog(LOG_WARNING, "elim.reaper: Run './elim.reaper --help' for more information.");
+
 			return FALSE;
 		} else if (lingerTime <= 600) {
-			syslog(LOG_WARNING, "elim.reaper: WARNING: JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime is %d", lingerTime);
+			syslog(LOG_WARNING, "elim.reaper: WARNING: JOB_INCLUDE_POSTPROC=N in lsb.params and lingerTime is [%d].", lingerTime);
 			syslog(LOG_WARNING, "elim.reaper: Run './elim.reaper --help' for more information.");
 		}
 	}
@@ -395,14 +524,14 @@ int get_login_sessions(user_struct_t *users, int maxLogins) {
 	i = 0;
 
 	if (debug) {
-		printf("elim.reaper: Starting to get login users\n");
+		syslog(LOG_NOTICE, "elim.reaper: Starting to get login users.");
 	}
 
 	fp = popen((char *) command, "r");
 
 	if (fp == NULL) {
 		if (debug) {
-			syslog(LOG_WARNING, "elim.reaper: WARNING: Unable to call the 'who' command");
+			syslog(LOG_WARNING, "elim.reaper: WARNING: Unable to call the 'who' command.");
 		}
 
 		return FALSE;
@@ -414,7 +543,7 @@ int get_login_sessions(user_struct_t *users, int maxLogins) {
 		line = trim(line);
 
 		if (debug) {
-			syslog(LOG_NOTICE, "elim.reaper: LINE: %s", line);
+			syslog(LOG_NOTICE, "elim.reaper: LINE: [%s]", line);
 		}
 
 		j = 0;
@@ -423,13 +552,13 @@ int get_login_sessions(user_struct_t *users, int maxLogins) {
 		while (p != NULL) {
 			if (j == 0) {
 				if (debug) {
-					syslog(LOG_NOTICE, "elim.reaper: USER: (%s)", p);
+					syslog(LOG_NOTICE, "elim.reaper: USER: [%s].", p);
 				}
 
 				snprintf(users[i].user, 40, "%s", p);
 			} else if (j == 1) {
 				if (debug) {
-					syslog(LOG_NOTICE, "elim.reaper: PID:  (%s)", p);
+					syslog(LOG_NOTICE, "elim.reaper: PID:  [%s].", p);
 				}
 
 				users[i].pid = atoi(p);
@@ -447,7 +576,7 @@ int get_login_sessions(user_struct_t *users, int maxLogins) {
 		i++;
 
 		if (i > maxLogins) {
-			syslog(LOG_WARNING, "WARNING: Maximum number of logins (%d) Reached", maxLogins);
+			syslog(LOG_WARNING, "WARNING: Maximum number of logins [%d] reached.", maxLogins);
 			break;
 		}
 	}
@@ -499,27 +628,27 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 	int endTime = 0;
 
 	if (debug) {
-		syslog(LOG_NOTICE, "elim.reaper: Starting to get LSF users");
+		syslog(LOG_NOTICE, "elim.reaper: Starting to get LSF users.");
 	}
 
 	/* initializing LSF */
 	if (debug) {
-		syslog(LOG_NOTICE, "elim.reaper: initializing LSF");
+		syslog(LOG_NOTICE, "elim.reaper: Initializing LSF.");
 	}
 
 	if (lsb_init("elim.reaper") < 0) {
-		syslog(LOG_NOTICE, "elim.reaper: lsb_init() failed allowing login");
+		syslog(LOG_NOTICE, "elim.reaper: lsb_init() failed allowing login.");
 		return FALSE;
 	}
 
 	if (debug) {
-		syslog(LOG_NOTICE, "elim.reaper: checking jobs for LSF hostname=%s", hostname);
+		syslog(LOG_NOTICE, "elim.reaper: checking jobs for LSF hostname [%s].", hostname);
 	}
 
 	jobs = lsb_openjobinfo(0, NULL, user, NULL, hostname, options);
 
 	if (debug) {
-		syslog(LOG_NOTICE, "elim.reaper: Found (%d) User jobs", jobs);
+		syslog(LOG_NOTICE, "elim.reaper: Found [%d] User jobs.", jobs);
 	}
 
 	if (jobs < 1) {
@@ -550,19 +679,20 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 			endTime = (long int) job->endTime;
 
 			if (debug) {
-				syslog(LOG_NOTICE, "elim.reaper: Found Job (%ul) with endTime (%i), curTime (%i), lingerTime (%i)", LSB_ARRAY_JOBID(job->jobId), endTime, nowTime, lingerTime);
+				syslog(LOG_NOTICE, "elim.reaper: Found Job [%ul] with endTime [%i], curTime [%i], lingerTime [%i].", LSB_ARRAY_JOBID(job->jobId), endTime, nowTime, lingerTime);
 			}
 
 			if (endTime > 0) {
 				if (nowTime - endTime <= lingerTime) {
 					if (debug) {
-						syslog(LOG_NOTICE, "elim.reaper: LOADING: Finished Job in linger range.");
+						syslog(LOG_NOTICE, "elim.reaper: LOADING: Finished Job in linger range window.");
 					}
 
 					snprintf(users[i].user, 40, "%s", job->user);
+
 					i++;
 				} else if (debug) {
-					syslog(LOG_NOTICE, "elim.reaper: SKIPPING: Finished Job outside linger range.");
+					syslog(LOG_NOTICE, "elim.reaper: SKIPPING: Finished Job outside linger range window.");
 				}
 			} else {
 				if (debug) {
@@ -570,11 +700,13 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 				}
 
 				snprintf(users[i].user, 40, "%s", job->user);
+
 				i++;
 			}
 
 			if (i > maxJobUsers) {
 				syslog(LOG_WARNING, "elim.reaper: host job number exceeds %s!", maxJobUsers);
+
 				return i;
 			}
 
@@ -585,6 +717,22 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 	}
 }
 
+int is_excluded_user(const char *user, groupUsers_t *groupUsers) {
+	int i = 0;
+
+	for (i = 0; i < maxUsers; i++ ) {
+		if (groupUsers[i].user != NULL) {
+			if (STRIMATCH(user, groupUsers[i].user)) {
+				return TRUE;
+			}
+		} else {
+			break;
+		}
+	}
+
+	return FALSE;
+}
+
 int is_lsf_admin(const char *user) {
 	int i;
 	struct clusterInfo *cluster;
@@ -592,7 +740,7 @@ int is_lsf_admin(const char *user) {
 	static int numAdmins = 0;
 
 	if (debug) {
-		syslog(LOG_NOTICE, "elim.reaper: Checking if user (%s) is and LSF Admin", user);
+		syslog(LOG_NOTICE, "elim.reaper: Checking if user [%s] is an LSF Admin.", user);
 	}
 
 	if (lsfAdmins == NULL) {
@@ -673,6 +821,11 @@ static void display_help(int only_version) {
 		"LSF_EXCLUDED_HOSTS = X   Space delimited list of hosts to exclude from reaper",
 		"                         checking.  These would include login nodes where",
 		"                         interactive logins are permitted by non LSF Admins.",
+		"LSF_EXCLUDED_UGROUPS = S Space delimited list of user groups to exclude from reaper",
+		"                         checking.  Any users a member of this LSF User Group will",
+		"                         not be reaped.",
+		"LSF_UGROUP_REFRESH = X   A numeric value in second as to how often to check LSF for",
+		"                         User Group membership.  The default is 3600 or one hour.",
 		"",
 		"Additionally, to leverage this tool, NEWJOB_REFRESH must be set to 'Y' in",
 		"in lsb.params and it is recommended that you set an LSF_LINGER_TIME",

@@ -34,6 +34,8 @@ You can optionally set a LSF_SLEEP_TIME to a value in seconds as well.  As you c
 
 You can also optionally set LSF_EXCLUDED_HOSTS to a space delimited list of hostnames that should be excluded from the reaper check.  An example of a host such as this would be a Login Node that is running LSF daemons for some reason.  As always, LSF Administrators are not reaped, so this would not have to include hosts in the LSF_MASTER_LIST.
 
+Additionally, there are two parameter that allow you to add LSF user group that should be allowed to login to the host even if there are not jobs running.  Those settings are LSF_EXCLUDED_UGROUPS wich needs to be set to a space delimited list of LSF user groups.  Non LSF user groups will be ignored.  The second parameter is the LSF_UGROUP_REFRESH, which instructs the elim.reaper how often it should recache the list off LSF users in those user groups.  The default is 3600 seconds or once an hour.
+
 If you wish to see debug output from the elim, you may run it with the --debug option.
 
 ## Community Contribution Requirements
@@ -55,7 +57,7 @@ Community contributions to this repository must follow the [IBM Developer's Cert
 
 ## Copyright
 
-(C) Copyright IBM Corporation 2016-2018
+(C) Copyright IBM Corporation 2016-2019
 
 U.S. Government Users Restricted Rights - Use, duplication or disclosure 
 restricted by GSA ADP Schedule Contract with IBM Corp.
