@@ -1,0 +1,34 @@
+#!/bin/bash
+# --------------------------------------------------------------------------
+# Name:    elim.css
+#
+# Purpose: LSF ELIM reports the hosts Context Switches per second.  These 
+#          metrics can be used for reporting, sorting, or creating 
+#          scheduling thresholds.
+#
+# Author:  Larry Adams <adamsla@us.ibm.com>
+#
+# --------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------
+# Change the one variable below to match lsf.shared
+# --------------------------------------------------------------------------
+sleep=60
+
+last_css=
+
+while true;do
+  if [ -z "$last_css" ]; then
+    last_css=`grep ctxt /proc/stat | awk '{print $2}'`
+    echo "0 "
+  else
+    css=`grep ctxt /proc/stat | awk '{print $2}'`
+    diffcss=$(($css-$last_css))
+    out_css=$(($diffcss/$sleep))
+    last_css=$css
+    echo "1 css $out_css"
+  fi
+
+  sleep $sleep
+done
+
