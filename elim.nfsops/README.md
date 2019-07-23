@@ -43,7 +43,7 @@ This job would reserve 1000 NFS operations per 10 seconds for a period of 60 sec
 
 ## Installation Instructions
 
-To install this elim, you must first add the "nfsops" numeric resource to LSF as per the normal process which involves updating your lsf.shared and lsf.cluster files to include the value.  Ensure that you assign this resource to hosts that you wish to clear user processes from automatically.
+To install this elim, you must first add the "nfsops" numeric resource to LSF as per the normal process which involves updating your lsf.shared and lsf.cluster files to include the value.  Ensure that you assign this resource to hosts that include either NFSv3 or NFSv4 mounts.
 
 Then, before restarting the cluster, make sure that the elim.nfsops binary has been copied to the $LSF_SERVERDIR for all compute hosts and marked executable.  After which, you can restart your cluster using:
 
