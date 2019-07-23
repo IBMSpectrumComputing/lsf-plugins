@@ -1,0 +1,82 @@
+#!/bin/bash
+# --------------------------------------------------------------------------
+# Name:    elim.nfsops
+#
+# Purpose: LSF ELIM reports the NFSv3 and NFSv4 client operations at the 
+#          host level.  These statistics can be aggregated at the
+#          cluster level by summing the individual host elims as well.
+#          these metrics can be used for reporting, sorting, or
+#          creating scheduling thresholds.
+#
+# Author:  Larry Adams <adamsla@us.ibm.com>
+#
+# --------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------
+# The layout of the proc filesystm is as follows
+# --------------------------------------------------------------------------
+# NFSv3
+# --------------------------------------------------------------------------
+# getattr setattr lookup access readlink read write create mkdir symlink \
+# mknod remove rmdir rename link readdir readdirplus fsstat fsinfo \
+# pathconf commit
+# --------------------------------------------------------------------------
+# NFSv4
+# --------------------------------------------------------------------------
+# read write commit open open_confirm open_noattr open_downgrade \
+# close setattr fsinfo renew setclientid setclientid_confirm \
+# lock lockt locku access getattr lookup lookup_root remove \
+# rename link symlink create pathconf statfs readlink readdir \
+# server_caps delegreturn getacl setacl fs_locations release_lockowner \
+# secinfo fsid_present exchange_id create_session destroy_session \
+# sequence get_lease_time reclaim_complete layoutget getdeviceinfo \
+# layoutcommit layoutreturn secinfo_no_name test_stateid free_stateid \
+# getdevicelist bind_conn_to_session destroy_clientid seek allocate \
+# deallocate layoutstats clone copy
+# --------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------
+# Set the collection interval to be modified by customer
+# --------------------------------------------------------------------------
+sleep=10
+
+# --------------------------------------------------------------------------
+# Set some initial values.  Don not change these values
+# --------------------------------------------------------------------------
+NFS=/proc/net/rpc/nfs
+current_ops3=0
+current_ops4=0
+prev_ops=
+
+# --------------------------------------------------------------------------
+# Determine the stack to use
+# --------------------------------------------------------------------------
+NFSv3=`cat /proc/net/rpc/nfs | grep proc3 | wc -l`
+NFSv4=`cat /proc/net/rpc/nfs | grep proc4 | wc -l`
+
+# --------------------------------------------------------------------------
+# Main elim loop
+# --------------------------------------------------------------------------
+while true; do
+  if [ $NFSv3 -gt 0 ]; then
+    current_ops3=`grep proc3 $NFS | awk '{print $4+$5+$6+$7+$8+$9+$10+$11+$12+$13+$14+$15+$16+$17+$18+$19+$20+$21+$22+$23+$24}'`
+  fi
+
+  if [ $NFSv4 -gt 0 ]; then
+    current_ops4=`grep proc4 $NFS | awk '{print $4+$5+$6+$7+$8+$9+$10+$11+$12+$13+$14+$15+$16+$17+$18+$19+$20+$21+$22+$23+$24+$25+$26+$27+$28+$29+$30+$31+$32+$33+$34+$35+$36+$37+$38+$39+$40+$41+$42+$43+$44+$45+$46+$47+$48+$49+$50}'`
+  fi
+
+  current_ops=$(( $current_ops3 + $current_ops4 ))
+
+  if [ -z $prev_ops ]; then
+    echo "1 nfsops 0"
+  else
+    rate=$((($current_ops-$prev_ops)/$sleep))
+    echo "1 nfsops $rate"
+  fi
+
+  prev_ops=$current_ops
+
+  sleep $sleep
+done
+
