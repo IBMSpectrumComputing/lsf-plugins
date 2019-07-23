@@ -1,0 +1,22 @@
+#!/bin/bash
+# --------------------------------------------------------------------------
+# Name:    elim.uptime
+#
+# Purpose: LSF ELIM reports the host uptime. These metrics can be used 
+#          for reporting, sorting, or creating scheduling thresholds.
+#
+# Author:  Larry Adams <adamsla@us.ibm.com>
+#
+# --------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------
+# Change the one variable below to match lsf.shared
+# --------------------------------------------------------------------------
+sleep=60
+ 
+while true; do
+  uptime=`cat /proc/uptime | awk '{print $1}' | awk -F. '{print $1}'`
+  echo "1 uptime $uptime"
+  sleep $sleep
+done
+
