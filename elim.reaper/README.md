@@ -38,7 +38,7 @@ Additionally, there are two parameters that allow you to exclude LSF users from 
 
 Those settings are LSF_EXCLUDED_UGROUPS wich needs to be set to a space delimited list of LSF user groups.  Non LSF user groups will be ignored.  The second parameter is the LSF_UGROUP_REFRESH, which instructs the elim.reaper how often it should recache the list off LSF users in those user groups.  The default is 3600 seconds or once an hour.
 
-If you wish to see debug output from the elim, you may run it with the --debug option.
+If you wish to see debug output from the elim, you may run it with the --debug option. Or add the following entry to the lsf.reaper file LSF_REAPER_DEBUG = true.
 
 ## Community Contribution Requirements
 
