@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
 							if (debug) {
 								syslog(LOG_NOTICE, "elim.reaper: User [%s] is an LSF Admin, skipping.", loginUsers[i].user);
 							}
-						} else if (!is_excluded_user(loginUsers[i].user, groupUsers)) {
+						} else if (is_excluded_user(loginUsers[i].user, groupUsers)) {
 							if (debug) {
 								syslog(LOG_NOTICE, "elim.reaper: User [%s] is an Excluded user, skipping.", loginUsers[i].user);
 							}
@@ -339,6 +339,12 @@ void load_lsf_reaper() {
 					snprintf(excludedUserGroups, sizeof(excludedUserGroups), "%s", value);
 				} else if (STRMATCH(variable, "LSF_UGROUP_REFRESH")) {
 					ugroupRefresh = atoi(value);
+				} else if (STRMATCH(variable, "LSF_REAPER_DEBUG")) {
+					if (STRIMATCH(value, "true")) {
+						debug = TRUE;
+					} else {
+						debug = FALSE;
+					}
 				}
 			}
 
@@ -348,7 +354,7 @@ void load_lsf_reaper() {
 }
 
 void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers) {
-	int  i, j;
+	int  i, j, k;
 	char *p;
 	int  enumGrp = 0;
 	int  options = USER_GRP | GRP_RECURSIVE;
@@ -386,6 +392,7 @@ void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers) {
 	grpInfo = lsb_usergrpinfo(userGroups, &enumGrp, options);
 
 	j = 0;
+	k = 0;
 	if (enumGrp > 0) {
 		for (i = 0; i < enumGrp; i++){
 			for (j = 0; j < maxGroups; j++) {
@@ -399,23 +406,23 @@ void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers) {
 							p = strtok(grpInfo[i].memberList, " ");
 
 							while (p != NULL) {
-								snprintf(groupUsers[i].user, 40, "%s", p);
+								snprintf(groupUsers[k].user, 40, "%s", p);
 
 								if (debug) {
-									syslog(LOG_NOTICE, "elim.reaper: Group Members: [%s].", groupUsers[i].user);
+									syslog(LOG_NOTICE, "elim.reaper: Group Members: [%s].", groupUsers[k].user);
 								}
 
-								j++;
+								k++;
 								p = strtok(NULL, " ");
 							}
-
-							groupUsers[i].user[0] = '\0';
 						}
 					}
 				}
 			}
 		}
 	}
+
+	groupUsers[k].user[0] = '\0';
 }
 
 int valid_lsf_setup() {
@@ -679,7 +686,7 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 			endTime = (long int) job->endTime;
 
 			if (debug) {
-				syslog(LOG_NOTICE, "elim.reaper: Found Job [%ul] with endTime [%i], curTime [%i], lingerTime [%i].", LSB_ARRAY_JOBID(job->jobId), endTime, nowTime, lingerTime);
+				syslog(LOG_NOTICE, "elim.reaper: Found Job [%lu] with endTime [%i], curTime [%i], lingerTime [%i].", LSB_ARRAY_JOBID(job->jobId), endTime, nowTime, lingerTime);
 			}
 
 			if (endTime > 0) {
@@ -720,9 +727,20 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 int is_excluded_user(const char *user, groupUsers_t *groupUsers) {
 	int i = 0;
 
+	if (debug) {
+		syslog(LOG_NOTICE, "elim.reaper: Start checking if user [%s] is an Excluded User.", user);
+	}
+
 	for (i = 0; i < maxUsers; i++ ) {
+		if (debug) {
+			syslog(LOG_NOTICE, "elim.reaper: Checking if user [%s/%s] is an Excluded User.", user, groupUsers[i].user);
+		}
+
 		if (groupUsers[i].user != NULL) {
 			if (STRIMATCH(user, groupUsers[i].user)) {
+				if (debug) {
+					syslog(LOG_NOTICE, "elim.reaper: User [%s] is an Excluded User.", user);
+				}
 				return TRUE;
 			}
 		} else {
@@ -847,4 +865,3 @@ static void display_help(int only_version) {
         }
     }
 }
-
