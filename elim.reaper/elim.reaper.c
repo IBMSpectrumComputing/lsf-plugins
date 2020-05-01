@@ -52,7 +52,9 @@ typedef struct admins {
 	char admin[40];
 } admins_t;
 
-char* userGroups[40];
+char *userGroups[40];
+
+char reaperResource[60];
 
 typedef struct groupUsers {
 	char user[40];
@@ -150,6 +152,10 @@ int main(int argc, char **argv) {
 	if (valid_lsf_setup()) {
 		if (debug) {
 			syslog(LOG_NOTICE, "elim.reaper: LSF setup is valid");
+		}
+
+		if (!has_required_resource(name.nodename)) {
+			exit(ELIM_ABORT_VALUE);
 		}
 
 		while(TRUE) {
@@ -256,13 +262,13 @@ int is_excluded_host(char *hostname) {
 
 	if (strcasestr(excludedHosts, hostname)) {
 		if (debug) {
-			syslog(LOG_NOTICE, "elim.reaper: host [%s] is an excluded host of [%s].", hostname, excludedHosts);
+			syslog(LOG_NOTICE, "elim.reaper: Host [%s] is an excluded host of [%s].", hostname, trim(excludedHosts));
 		}
 
 		return TRUE;
 	} else {
 		if (debug) {
-			syslog(LOG_NOTICE, "elim.reaper: host [%s] is not an excluded host of [%s].", hostname, excludedHosts);
+			syslog(LOG_NOTICE, "elim.reaper: Host [%s] is not an excluded host of [%s].", hostname, trim(excludedHosts));
 		}
 
 		return FALSE;
@@ -339,6 +345,8 @@ void load_lsf_reaper() {
 					snprintf(excludedUserGroups, sizeof(excludedUserGroups), "%s", value);
 				} else if (STRMATCH(variable, "LSF_UGROUP_REFRESH")) {
 					ugroupRefresh = atoi(value);
+				} else if (STRMATCH(variable, "LSF_REAPER_RESOURCE")) {
+					snprintf(reaperResource, sizeof(reaperResource), "%s", value);
 				} else if (STRMATCH(variable, "LSF_REAPER_DEBUG")) {
 					if (STRIMATCH(value, "true")) {
 						debug = TRUE;
@@ -399,7 +407,7 @@ void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers) {
 				if (userGroups[j] != NULL) {
 					if (STRIMATCH(grpInfo[i].group, userGroups[j])) {
 						if (debug) {
-							syslog(LOG_NOTICE, "elim.notice: Found Group [%s] with Members: [%s].", grpInfo[i].group, grpInfo[i].memberList);
+							syslog(LOG_NOTICE, "elim.notice: Found Group [%s] with Members: [%s].", grpInfo[i].group, trim(grpInfo[i].memberList));
 						}
 
 						if (strlen(grpInfo[i].memberList)) {
@@ -423,6 +431,41 @@ void reloadUserGroups(char **userGroups, groupUsers_t *groupUsers) {
 	}
 
 	groupUsers[k].user[0] = '\0';
+}
+
+int has_required_resource(char *hostname) {
+	char   resreq[255];
+	int    numhosts    = 0;
+	char   **hostlist  = NULL;
+	int    listsize    = 0;
+	int    options     = 0;
+	struct hostInfo *hostinfo;
+
+	if (strlen(reaperResource) == 0) {
+		if (debug) {
+			syslog(LOG_NOTICE, "elim.reaper: Reaper Resource Not Defined for: [%s].", hostname);
+		}
+
+		return TRUE;
+	} else {
+		snprintf(resreq, sizeof(resreq), "select[hname=%s && defined(%s)]", hostname, reaperResource);
+
+		hostinfo = ls_gethostinfo(resreq, &numhosts, hostlist, listsize, options);
+
+		if (hostinfo == NULL) {
+			if (debug) {
+				syslog(LOG_NOTICE, "elim.reaper: Reaper Resource found but not defined for [%s], exiting!", hostname);
+			}
+
+			return FALSE;
+		}
+	}
+
+	if (debug) {
+		syslog(LOG_NOTICE, "elim.reaper: Reaper Resource defined and found for [%s].", hostname);
+	}
+
+	return TRUE;
 }
 
 int valid_lsf_setup() {
@@ -712,7 +755,7 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 			}
 
 			if (i > maxJobUsers) {
-				syslog(LOG_WARNING, "elim.reaper: host job number exceeds %s!", maxJobUsers);
+				syslog(LOG_WARNING, "elim.reaper: Host job number exceeds %s!", maxJobUsers);
 
 				return i;
 			}
