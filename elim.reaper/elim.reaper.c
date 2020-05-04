@@ -448,7 +448,7 @@ int has_required_resource(char *hostname) {
 
 		return TRUE;
 	} else {
-		snprintf(resreq, sizeof(resreq), "select[hname=%s && defined(%s)]", hostname, reaperResource);
+		snprintf(resreq, sizeof(resreq), "select[hname==%s && defined(%s)]", hostname, reaperResource);
 
 		hostinfo = ls_gethostinfo(resreq, &numhosts, hostlist, listsize, options);
 
