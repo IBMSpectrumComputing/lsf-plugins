@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
 			currentTime = time(NULL);
 
 			if (debug) {
-				syslog(LOG_NOTICE, "elim.reaper: Time differential = %d", currentTime - lastTime);
+				syslog(LOG_NOTICE, "elim.reaper: Time differential = %lu", currentTime - lastTime);
 				syslog(LOG_NOTICE, "elim.reaper: Refresh UGroup = %d", ugroupRefresh);
 			}
 
@@ -665,7 +665,6 @@ int file_exists(const char *filename) {
 int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 	int options = ALL_JOB;
 	int jobs;
-	int nowTime = (int)time(NULL);
 	int i;
 	int more;
 	char * user = "all";
@@ -675,7 +674,8 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 	int retries = 3;
 	int count = 0;
 	int error_count = 0;
-	int endTime = 0;
+	unsigned long nowTime = time(NULL);
+	unsigned long endTime = 0;
 
 	if (debug) {
 		syslog(LOG_NOTICE, "elim.reaper: Starting to get LSF users.");
@@ -726,10 +726,10 @@ int get_job_users(user_struct_t *users, int maxJobUsers, char *hostname) {
 				}
 			}
 
-			endTime = (long int) job->endTime;
+			endTime = (unsigned long) job->endTime;
 
 			if (debug) {
-				syslog(LOG_NOTICE, "elim.reaper: Found Job [%lu] with endTime [%i], curTime [%i], lingerTime [%i].", LSB_ARRAY_JOBID(job->jobId), endTime, nowTime, lingerTime);
+				syslog(LOG_NOTICE, "elim.reaper: Found Job [%lu] with endTime [%lu], curTime [%lu], lingerTime [%d].", LSB_ARRAY_JOBID(job->jobId), endTime, nowTime, lingerTime);
 			}
 
 			if (endTime > 0) {
