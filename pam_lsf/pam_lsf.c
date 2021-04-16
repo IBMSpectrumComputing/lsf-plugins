@@ -15,9 +15,10 @@
 #define SLEEP_TIME 2
 
 #include <stdio.h>
+#include <pwd.h>
 #include <stdlib.h>
 #include <syslog.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/utsname.h>
 #include <lsf/lsbatch.h>
 #include <lsf/lsf.h>
@@ -38,11 +39,14 @@
 #include <security/pam_modules.h>
 #include <security/_pam_macros.h>
 
+uid_t lsfadmin = 0;
+
 /* function to check for running LSF jobs */
 int lsf_check(const char *username, char *hostname, int *debug) {
 	int options = CUR_JOB;
 	int jobs;
 	int retries = 0;
+	uid_t uid = 0;
 
 	/* initializing LSF */
 	if (debug) {
@@ -59,9 +63,18 @@ int lsf_check(const char *username, char *hostname, int *debug) {
 	}
 
 	while (retries < MAX_RETRIES) {
+		uid = getuid();
+		if (lsfadmin > 0) {
+			seteuid(lsfadmin);
+		}
+
 		jobs = lsb_openjobinfo(0, NULL, (char *) username, NULL, hostname, options);
 
 		lsb_closejobinfo();
+
+		if (lsfadmin > 0) {
+			seteuid(uid);
+		}
 
 		if (jobs > 0) {
 			return TRUE;
@@ -78,11 +91,20 @@ int lsf_check(const char *username, char *hostname, int *debug) {
 int lsf_admin_check(const char *user, int *debug) {
 	int i;
 	struct clusterInfo *cluster;
+	struct passwd *pwd;
 
 	cluster = ls_clusterinfo(NULL, NULL, NULL, 0, 0);
 
 	if (cluster != NULL) {
 		for (i = 0; i < cluster->nAdmins; i++) {
+			// Get the primary LSF admins UID for future use
+			if (i == 0) {
+				pwd = getpwnam(cluster->admins[i]);
+				if (pwd != NULL) {
+					lsfadmin = (long)pwd->pw_uid;
+				}
+			}
+
 			if (debug) {
 				syslog(LOG_NOTICE, "pam_lsf.so: comparing cluster admin %s", cluster->admins[i]);
 			}
